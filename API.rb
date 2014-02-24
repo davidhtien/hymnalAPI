@@ -7,6 +7,7 @@ require 'json'
 require 'pp'
 # require 'haml'
 # require 'builder'
+require 'faraday'
 
 get '/' do
 	"welcome to hymnal.net (unofficial) API"
@@ -111,6 +112,13 @@ end
 # only for new songs
 # shouldn't expect this too much as new song "ids" are arbitrary
 get '/hymn/ns/:id' do
+
+    content_type :json
+
+    nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
+    response = faraday.head(nsURL).status
+    if response == 200
+        
     
 end
 
