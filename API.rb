@@ -116,8 +116,10 @@ get '/ns/:id' do
     content_type :json
     
     nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
-    response = faraday.head(nsURL).status
-    if response == 200
+    conn = faraday.get "http://hymnal.net/hymn.php/ns/#{params[:id]}"
+    conn :logger
+    p conn
+    if conn.response == 200
         page = Nokogiri::HTML(open(nsURL))
 
         # this will be exported to JSON
