@@ -114,11 +114,11 @@ end
 get '/ns/:id' do
     'New Songs'
     #content_type :json
+    
+    #nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
+    #response = faraday.head(nsURL).status
 
-    nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
-    response = faraday.head(nsURL).status
-
-    binding.remote_pry
+    #binding.remote_pry
     
 end
 
