@@ -111,7 +111,7 @@ end
 
 # only for new songs
 # shouldn't expect this too much as new song "ids" are arbitrary
-get '/hymn/ns/:id' do
+get '/ns/:id' do
     'New Songs'
     #content_type :json
 
