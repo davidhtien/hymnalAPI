@@ -117,6 +117,8 @@ get '/ns/:id' do
 
     nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
     response = faraday.head(nsURL).status
+
+    binding.remote_pry
     
 end
 
