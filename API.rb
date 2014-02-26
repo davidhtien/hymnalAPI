@@ -112,14 +112,62 @@ end
 # only for new songs
 # shouldn't expect this too much as new song "ids" are arbitrary
 get '/ns/:id' do
-    'New Songs'
-    #content_type :json
+    #'New Songs'
+    content_type :json
     
-    #nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
-    #response = faraday.head(nsURL).status
+    nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
+    response = faraday.head(nsURL).status
+    if response == 200
+        page = Nokogiri::HTML(open(nsURL))
 
-    #binding.remote_pry
-    
+        # this will be exported to JSON
+        newSong = Hash.new
+
+        # pre-processing: eliminate <br> tags
+        page.search('br').each do |n|
+            n.replace("\n")
+        end
+        
+        # extract song details w/ link
+        # i.e. category, meter, composer, etc.
+        details = Hash.new
+        for element in page.css("div#details li") do
+            details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+        end
+
+        lyrics = Hash.new
+        # grab title
+        newSong['title'] = page.css('div.post-title span').text.strip()
+        for element in page.css('div.lyrics li') do
+            # verse numbers are denoted in <li value='1'> tags
+            if element['value']
+                # store stanza as a list of lines
+                lyrics['stanza ' + element['value']] = element.text.split("\n")
+
+            # chorus(es) are denoted in <li class='chorus'> tags
+            elsif element['class']
+                if !lyrics.has_key?(element['class'])
+                    lyrics[element['class']] = element.text.split("\n")
+                # if there are multiple choruses:
+                else
+                    # append some whitespace to create a unique key
+                    lyrics[element['class'] + ' ' + String(1+lyrics.length/2)] = element.text.split("\n")
+                end
+            end
+        end
+
+        # build and return JSON
+        newSong['details'] = details
+        newSong['lyrics'] = lyrics
+        newSong.to_json
+
+    else
+        # throw error in JSON
+        error = Hash.new
+        error['error'] = "Sorry, there is no new song with that number."
+        error.to_json
+    end
+
 end
 
 # search results
