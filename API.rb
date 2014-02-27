@@ -9,6 +9,9 @@ require 'pp'
 # require 'builder'
 require 'faraday'
 
+enable :run
+enable :logging
+
 get '/' do
 	"welcome to hymnal.net (unofficial) API"
     
@@ -114,12 +117,29 @@ end
 get '/ns/:id' do
     #'New Songs'
     content_type :json
-    
+
+    #this method is not completely accurate since hymnal.net doesn't always put the most recent songs on the front page
+    #will need to add onto this
+    most_recent = 0
+    while most_recent == 0
+        home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
+        home.search('br').each do |n|
+            n.replace("\n")
+        end
+        for element in home.css('ul.songsublist li') do
+            if element.css('span.category').text.gsub!(/\P{ASCII}/, '') == "NewSongs"
+                num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+                if num > most_recent
+                    most_recent = num
+                end
+            end
+        end
+    end
+
+    puts most_recent
+
     nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
-    conn = faraday.get "http://hymnal.net/hymn.php/ns/#{params[:id]}"
-    conn :logger
-    p conn
-    if conn.response == 200
+    if Integer(params[:id]) > 0 and Integer(params[:id]) <= Integer(most_recent)
         page = Nokogiri::HTML(open(nsURL))
 
         # this will be exported to JSON
@@ -134,7 +154,12 @@ get '/ns/:id' do
         # i.e. category, meter, composer, etc.
         details = Hash.new
         for element in page.css("div#details li") do
-            details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            #puts element.css('a').text.empty?
+            unless element.css('a').text.empty?
+                details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            else 
+                details[element.css('span.key').text] = nil
+            end
         end
 
         lyrics = Hash.new
@@ -166,7 +191,7 @@ get '/ns/:id' do
     else
         # throw error in JSON
         error = Hash.new
-        error['error'] = "Sorry, there is no new song with that number."
+        error['error'] = "Sorry, there is no new song with that number. The most recent new song has the number " + most_recent.to_s
         error.to_json
     end
 
