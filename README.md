@@ -12,9 +12,8 @@ features:
 
 [completed]
 - classic hymns
-
-[in progress]
 - new songs
+- children
 
 [planned]
 - PDFs and sheet music
@@ -24,7 +23,8 @@ features:
 - composer
 - author
 - meter
-- verse 
+- verse
+- languages
 
 suggestions are welcome!
 
