@@ -2,15 +2,12 @@ require 'rubygems'
 require 'sinatra'
 require 'nokogiri'
 require 'open-uri'
-# require 'sanitize'
 require 'json'
 require 'pp'
 # require 'haml'
-# require 'builder'
-require 'faraday'
 
 enable :run
-enable :logging
+#enable :logging
 
 get '/' do
 	"welcome to hymnal.net (unofficial) API"
