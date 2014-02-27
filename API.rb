@@ -25,8 +25,8 @@ get '/hymn/:id' do
     content_type :json
     
     # {id} must be an int between 1-1348
+    hymnURL = "http://hymnal.net/hymn.php/h/#{params[:id]}"
     if Integer(params[:id]) > 0 and Integer(params[:id]) < 1349
-        hymnURL = "http://hymnal.net/hymn.php/h/#{params[:id]}"
         page = Nokogiri::HTML(open(hymnURL))
 
         # this will be exported to JSON
@@ -41,7 +41,11 @@ get '/hymn/:id' do
         # i.e. category, meter, composer, etc.
         details = Hash.new
         for element in page.css("div#details li") do
-            details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            unless element.css('a').text.empty?
+                details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            else 
+                details[element.css('span.key').text] = nil
+            end
         end
         
         # extract lyrics
@@ -112,8 +116,7 @@ get '/hymn/:id' do
 
 end
 
-# only for new songs
-# shouldn't expect this too much as new song "ids" are arbitrary
+# new songs
 get '/ns/:id' do
     #'New Songs'
     content_type :json
@@ -191,7 +194,91 @@ get '/ns/:id' do
     else
         # throw error in JSON
         error = Hash.new
-        error['error'] = "Sorry, there is no new song with that number. The most recent new song has the number " + most_recent.to_s
+        error['error'] = "Sorry, there is no new song with that number. The most recent new song known to the API has the number " + most_recent.to_s
+        error.to_json
+    end
+
+end
+
+# children
+get '/children/:id' do
+    #'New Songs'
+    content_type :json
+
+    #this method is not completely accurate since hymnal.net doesn't always put the most recent songs on the front page
+    #will need to add onto this
+    most_recent = 0
+    while most_recent == 0
+        home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
+        home.search('br').each do |n|
+            n.replace("\n")
+        end
+        for element in home.css('ul.songsublist li') do
+            if element.css('span.category').text == "Children"
+                num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+                if num > most_recent
+                    most_recent = num
+                end
+            end
+        end
+    end
+
+    puts most_recent
+
+    childrenURL = "http://hymnal.net/hymn.php/c/#{params[:id]}"
+    if Integer(params[:id]) > 0 and Integer(params[:id]) <= Integer(most_recent)
+        page = Nokogiri::HTML(open(childrenURL))
+
+        # this will be exported to JSON
+        children = Hash.new
+
+        # pre-processing: eliminate <br> tags
+        page.search('br').each do |n|
+            n.replace("\n")
+        end
+        
+        # extract song details w/ link
+        # i.e. category, meter, composer, etc.
+        details = Hash.new
+        for element in page.css("div#details li") do
+            #puts element.css('a').text.empty?
+            unless element.css('a').text.empty?
+                details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            else 
+                details[element.css('span.key').text] = nil
+            end
+        end
+
+        lyrics = Hash.new
+        # grab title
+        children['title'] = page.css('div.post-title span').text.strip()
+        for element in page.css('div.lyrics li') do
+            # verse numbers are denoted in <li value='1'> tags
+            if element['value']
+                # store stanza as a list of lines
+                lyrics['stanza ' + element['value']] = element.text.split("\n")
+
+            # chorus(es) are denoted in <li class='chorus'> tags
+            elsif element['class']
+                if !lyrics.has_key?(element['class'])
+                    lyrics[element['class']] = element.text.split("\n")
+                # if there are multiple choruses:
+                else
+                    # append some whitespace to create a unique key
+                    lyrics[element['class'] + ' ' + String(1+lyrics.length/2)] = element.text.split("\n")
+                end
+            end
+        end
+
+        # build and return JSON
+        children['details'] = details
+        children['lyrics'] = lyrics
+        children.to_json
+
+    else
+        # throw error in JSON
+        error = Hash.new
+        error['error'] = "Sorry, there is no children's song with that number. The most recent new song known to the API has the number " + most_recent.to_s
         error.to_json
     end
 
