@@ -99,9 +99,27 @@ get '/hymn/:id' do
             end
         end
 
+        #Is there a new tune or alternate tune?
+        #Doesn't work for all cases yet
+        tunes = Hash.new
+        puts "got here"
+        for element in page.css('div.relatedsongs li')
+            puts element.css('a').text
+            puts element.css('a').text.ascii_only?
+            if element.css('a').text == "New Tune"
+                tunes['New Tune'] = element.css('a')[0]['href']
+            end
+            if element.css('a').text == "Alternate Tune"
+                tunes['Alternate Tune'] = element.css('a')[0]['href']
+            end
+        end
+
         # build and return JSON
         hymn['details'] = details
         hymn['lyrics'] = lyrics
+        unless tunes.empty?
+            hymn['tunes'] = tunes
+        end
         hymn.to_json
         
     else
