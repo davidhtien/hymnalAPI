@@ -120,7 +120,7 @@ get '/hymn/:id' do
         unless tunes.empty?
             hymn['tunes'] = tunes
         end
-        hymn.to_json
+        JSON.pretty_generate(hymn)
         
     else
         # throw error in JSON
@@ -204,7 +204,7 @@ get '/ns/:id' do
         # build and return JSON
         newSong['details'] = details
         newSong['lyrics'] = lyrics
-        newSong.to_json
+        JSON.pretty_generate(newSong)
 
     else
         # throw error in JSON
@@ -287,7 +287,7 @@ get '/children/:id' do
         # build and return JSON
         children['details'] = details
         children['lyrics'] = lyrics
-        children.to_json
+        JSON.pretty_generate(children)
 
     else
         # throw error in JSON
@@ -333,7 +333,7 @@ get '/most_recent' do
 
     recent['New Song'] = recent_ns
     recent['Children'] = recent_c
-    recent.to_json
+    JSON.pretty_generate(recent)
 end
 
 ###################
