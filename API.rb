@@ -217,7 +217,6 @@ end
 
 # children
 get '/children/:id' do
-    #'New Songs'
     content_type :json
 
     #this method is not completely accurate since hymnal.net doesn't always put the most recent songs on the front page
@@ -302,6 +301,39 @@ end
 # search results
 get '/search/:string' do
 
+end
+
+# most recent
+get '/most_recent' do
+    #grabs most recent children and new song according to home page
+    content_type :json
+
+    recent = Hash.new
+
+    recent_ns = 0
+    recent_c = 0
+    home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
+    home.search('br').each do |n|
+        n.replace("\n")
+    end
+    for element in home.css('ul.songsublist li') do
+        if element.css('span.category').text.gsub!(/\P{ASCII}/, '') == "NewSongs"
+            num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+            if num > recent_ns
+                recent_ns = num
+            end
+        end
+        if element.css('span.category').text == "Children"
+            num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+            if num > recent_c
+                recent_c = num
+            end
+        end
+    end
+
+    recent['New Song'] = recent_ns
+    recent['Children'] = recent_c
+    recent.to_json
 end
 
 ###################
