@@ -57,10 +57,10 @@ get "/hymn/:id" do
             # grab title
             hymn["title"] = page.css("h1").text.strip()
             # grab author
-            details["Lyrics:"] = page.search("[text()*="AUTHOR:"]").first.parent.text.gsub("AUTHOR:", "").strip
+            details["Lyrics:"] = page.search("[text()*='AUTHOR:']").first.parent.text.gsub("AUTHOR:", "").strip
 
             # 
-            for element in page.css("table[width="500"] tr td") do
+            for element in page.css("table[width='500'] tr td") do
                 # only consider <td> if content is not whitespace
                 unless element.text.gsub(/[[:space:]]/, "") == ""
                     # if stanza number
