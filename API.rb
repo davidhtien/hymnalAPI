@@ -1,15 +1,15 @@
-require 'rubygems'
-require 'sinatra'
-require 'nokogiri'
-require 'open-uri'
-require 'json'
-require 'pp'
-# require 'haml'
+require "rubygems"
+require "sinatra"
+require "nokogiri"
+require "open-uri"
+require "json"
+require "pp"
+# require "haml"
 
 enable :run
 #enable :logging
 
-get '/' do
+get "/" do
 	"welcome to hymnal.net (unofficial) API"
     
     # HAML ? documentation page
@@ -17,7 +17,7 @@ get '/' do
 end
 
 # classic hymns
-get '/hymn/:id' do
+get "/hymn/:id" do
 
     content_type :json
     
@@ -30,7 +30,7 @@ get '/hymn/:id' do
         hymn = Hash.new
 
         # pre-processing: eliminate <br> tags
-        page.search('br').each do |n|
+        page.search("br").each do |n|
             n.replace("\n")
         end
         
@@ -38,10 +38,10 @@ get '/hymn/:id' do
         # i.e. category, meter, composer, etc.
         details = Hash.new
         for element in page.css("div#details li") do
-            unless element.css('a').text.empty?
-                details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            unless element.css("a").text.empty?
+                details[element.css("span.key").text] = [element.css("a").text, element.css("a")[0]["href"]]
             else 
-                details[element.css('span.key').text] = nil
+                details[element.css("span.key").text] = nil
             end
         end
         
@@ -50,26 +50,26 @@ get '/hymn/:id' do
         # external site redirect - scrape witness-lee-hymns.org
         if page.css("div.lyrics p[class=info]").text == "View Lyrics (external site)"
             # pad zeroes
-            id = params[:id].rjust(4, '0')
-            hymnURL = page.css('div.lyrics p a')[0]['href']
+            id = params[:id].rjust(4, "0")
+            hymnURL = page.css("div.lyrics p a")[0]["href"]
             page = Nokogiri::HTML(open(hymnURL))
 
             # grab title
-            hymn['title'] = page.css('h1').text.strip()
+            hymn["title"] = page.css("h1").text.strip()
             # grab author
-            details['Lyrics:'] = page.search("[text()*='AUTHOR:']").first.parent.text.gsub("AUTHOR:", "").strip
+            details["Lyrics:"] = page.search("[text()*="AUTHOR:"]").first.parent.text.gsub("AUTHOR:", "").strip
 
             # 
-            for element in page.css("table[width='500'] tr td") do
+            for element in page.css("table[width="500"] tr td") do
                 # only consider <td> if content is not whitespace
-                unless element.text.gsub(/[[:space:]]/, '') == ''
+                unless element.text.gsub(/[[:space:]]/, "") == ""
                     # if stanza number
                     if element.text.to_i > 0
                         # create a new entry with an empty list
-                        lyrics['stanza ' + element.text.strip] = []
+                        lyrics["stanza " + element.text.strip] = []
                     # if chorus
-                    elsif element.text.gsub(/[[:space:]]/, '') == "Chorus"
-                        lyrics['chorus'] = []
+                    elsif element.text.gsub(/[[:space:]]/, "") == "Chorus"
+                        lyrics["chorus"] = []
                     # if line
                     else
                         lyrics[lyrics.keys.last].push(element.text)
@@ -79,74 +79,74 @@ get '/hymn/:id' do
         # scrape hymnal.net
         else        
             # grab title
-            hymn['title'] = page.css('div.post-title span').text.strip()
-            for element in page.css('div.lyrics li') do
-                # verse numbers are denoted in <li value='1'> tags
-                if element['value']
+            hymn["title"] = page.css("div.post-title span").text.strip()
+            for element in page.css("div.lyrics li") do
+                # verse numbers are denoted in <li value="1"> tags
+                if element["value"]
                     # store stanza as a list of lines
-                    lyrics['stanza ' + element['value']] = element.text.split("\n")
+                    lyrics["stanza " + element["value"]] = element.text.split("\n")
 
-                # chorus(es) are denoted in <li class='chorus'> tags
-                elsif element['class']
-                    if !lyrics.has_key?(element['class'])
-                        lyrics[element['class']] = element.text.split("\n")
+                # chorus(es) are denoted in <li class="chorus"> tags
+                elsif element["class"]
+                    if !lyrics.has_key?(element["class"])
+                        lyrics[element["class"]] = element.text.split("\n")
                     # if there are multiple choruses:
                     else
                         # append some whitespace to create a unique key
-                        lyrics[element['class'] + ' ' + String(1+lyrics.length/2)] = element.text.split("\n")
+                        lyrics[element["class"] + " " + String(1+lyrics.length/2)] = element.text.split("\n")
                     end
                 end
             end
         end
 
         #Is there a new tune or alternate tune?
-        #Doesn't work for all cases yet
+        #Doesn"t work for all cases yet
         tunes = Hash.new
         puts "got here"
-        for element in page.css('div.relatedsongs li')
-            puts element.css('a').text
-            puts element.css('a').text.ascii_only?
-            if element.css('a').text == "New Tune"
-                tunes['New Tune'] = element.css('a')[0]['href']
+        for element in page.css("div.relatedsongs li")
+            puts element.css("a").text
+            puts element.css("a").text.ascii_only?
+            if element.css("a").text == "New Tune"
+                tunes["New Tune"] = element.css("a")[0]["href"]
             end
-            if element.css('a').text == "Alternate Tune"
-                tunes['Alternate Tune'] = element.css('a')[0]['href']
+            if element.css("a").text == "Alternate Tune"
+                tunes["Alternate Tune"] = element.css("a")[0]["href"]
             end
         end
 
         # build and return JSON
-        hymn['details'] = details
-        hymn['lyrics'] = lyrics
+        hymn["details"] = details
+        hymn["lyrics"] = lyrics
         unless tunes.empty?
-            hymn['tunes'] = tunes
+            hymn["tunes"] = tunes
         end
         JSON.pretty_generate(hymn)
         
     else
         # throw error in JSON
         error = Hash.new
-        error['error'] = "Sorry, there is no hymn with that number. Hymn should be within the 1-1348 range."
+        error["error"] = "Sorry, there is no hymn with that number. Hymn should be within the 1-1348 range."
         error.to_json
     end
 
 end
 
 # new songs
-get '/ns/:id' do
-    #'New Songs'
+get "/ns/:id" do
+    #"New Songs"
     content_type :json
 
-    #this method is not completely accurate since hymnal.net doesn't always put the most recent songs on the front page
+    #this method is not completely accurate since hymnal.net doesn"t always put the most recent songs on the front page
     #will need to add onto this
     most_recent = 0
     while most_recent == 0
         home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
-        home.search('br').each do |n|
+        home.search("br").each do |n|
             n.replace("\n")
         end
-        for element in home.css('ul.songsublist li') do
-            if element.css('span.category').text.gsub!(/\P{ASCII}/, '') == "NewSongs"
-                num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+        for element in home.css("ul.songsublist li") do
+            if element.css("span.category").text.gsub!(/\P{ASCII}/, "") == "NewSongs"
+                num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
                 if num > most_recent
                     most_recent = num
                 end
@@ -164,7 +164,7 @@ get '/ns/:id' do
         newSong = Hash.new
 
         # pre-processing: eliminate <br> tags
-        page.search('br').each do |n|
+        page.search("br").each do |n|
             n.replace("\n")
         end
         
@@ -172,64 +172,64 @@ get '/ns/:id' do
         # i.e. category, meter, composer, etc.
         details = Hash.new
         for element in page.css("div#details li") do
-            #puts element.css('a').text.empty?
-            unless element.css('a').text.empty?
-                details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            #puts element.css("a").text.empty?
+            unless element.css("a").text.empty?
+                details[element.css("span.key").text] = [element.css("a").text, element.css("a")[0]["href"]]
             else 
-                details[element.css('span.key').text] = nil
+                details[element.css("span.key").text] = nil
             end
         end
 
         lyrics = Hash.new
         # grab title
-        newSong['title'] = page.css('div.post-title span').text.strip()
-        for element in page.css('div.lyrics li') do
-            # verse numbers are denoted in <li value='1'> tags
-            if element['value']
+        newSong["title"] = page.css("div.post-title span").text.strip()
+        for element in page.css("div.lyrics li") do
+            # verse numbers are denoted in <li value="1"> tags
+            if element["value"]
                 # store stanza as a list of lines
-                lyrics['stanza ' + element['value']] = element.text.split("\n")
+                lyrics["stanza " + element["value"]] = element.text.split("\n")
 
-            # chorus(es) are denoted in <li class='chorus'> tags
-            elsif element['class']
-                if !lyrics.has_key?(element['class'])
-                    lyrics[element['class']] = element.text.split("\n")
+            # chorus(es) are denoted in <li class="chorus"> tags
+            elsif element["class"]
+                if !lyrics.has_key?(element["class"])
+                    lyrics[element["class"]] = element.text.split("\n")
                 # if there are multiple choruses:
                 else
                     # append some whitespace to create a unique key
-                    lyrics[element['class'] + ' ' + String(1+lyrics.length/2)] = element.text.split("\n")
+                    lyrics[element["class"] + " " + String(1+lyrics.length/2)] = element.text.split("\n")
                 end
             end
         end
 
         # build and return JSON
-        newSong['details'] = details
-        newSong['lyrics'] = lyrics
+        newSong["details"] = details
+        newSong["lyrics"] = lyrics
         JSON.pretty_generate(newSong)
 
     else
         # throw error in JSON
         error = Hash.new
-        error['error'] = "Sorry, there is no new song with that number. The most recent new song known to the API has the number " + most_recent.to_s
+        error["error"] = "Sorry, there is no new song with that number. The most recent new song known to the API has the number " + most_recent.to_s
         error.to_json
     end
 
 end
 
 # children
-get '/children/:id' do
+get "/children/:id" do
     content_type :json
 
-    #this method is not completely accurate since hymnal.net doesn't always put the most recent songs on the front page
+    #this method is not completely accurate since hymnal.net doesn"t always put the most recent songs on the front page
     #will need to add onto this
     most_recent = 0
     while most_recent == 0
         home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
-        home.search('br').each do |n|
+        home.search("br").each do |n|
             n.replace("\n")
         end
-        for element in home.css('ul.songsublist li') do
-            if element.css('span.category').text == "Children"
-                num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+        for element in home.css("ul.songsublist li") do
+            if element.css("span.category").text == "Children"
+                num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
                 if num > most_recent
                     most_recent = num
                 end
@@ -247,7 +247,7 @@ get '/children/:id' do
         children = Hash.new
 
         # pre-processing: eliminate <br> tags
-        page.search('br').each do |n|
+        page.search("br").each do |n|
             n.replace("\n")
         end
         
@@ -255,56 +255,56 @@ get '/children/:id' do
         # i.e. category, meter, composer, etc.
         details = Hash.new
         for element in page.css("div#details li") do
-            #puts element.css('a').text.empty?
-            unless element.css('a').text.empty?
-                details[element.css('span.key').text] = [element.css('a').text, element.css('a')[0]['href']]
+            #puts element.css("a").text.empty?
+            unless element.css("a").text.empty?
+                details[element.css("span.key").text] = [element.css("a").text, element.css("a")[0]["href"]]
             else 
-                details[element.css('span.key').text] = nil
+                details[element.css("span.key").text] = nil
             end
         end
 
         lyrics = Hash.new
         # grab title
-        children['title'] = page.css('div.post-title span').text.strip()
-        for element in page.css('div.lyrics li') do
-            # verse numbers are denoted in <li value='1'> tags
-            if element['value']
+        children["title"] = page.css("div.post-title span").text.strip()
+        for element in page.css("div.lyrics li") do
+            # verse numbers are denoted in <li value="1"> tags
+            if element["value"]
                 # store stanza as a list of lines
-                lyrics['stanza ' + element['value']] = element.text.split("\n")
+                lyrics["stanza " + element["value"]] = element.text.split("\n")
 
-            # chorus(es) are denoted in <li class='chorus'> tags
-            elsif element['class']
-                if !lyrics.has_key?(element['class'])
-                    lyrics[element['class']] = element.text.split("\n")
+            # chorus(es) are denoted in <li class="chorus"> tags
+            elsif element["class"]
+                if !lyrics.has_key?(element["class"])
+                    lyrics[element["class"]] = element.text.split("\n")
                 # if there are multiple choruses:
                 else
                     # append some whitespace to create a unique key
-                    lyrics[element['class'] + ' ' + String(1+lyrics.length/2)] = element.text.split("\n")
+                    lyrics[element["class"] + " " + String(1+lyrics.length/2)] = element.text.split("\n")
                 end
             end
         end
 
         # build and return JSON
-        children['details'] = details
-        children['lyrics'] = lyrics
+        children["details"] = details
+        children["lyrics"] = lyrics
         JSON.pretty_generate(children)
 
     else
         # throw error in JSON
         error = Hash.new
-        error['error'] = "Sorry, there is no children's song with that number. The most recent new song known to the API has the number " + most_recent.to_s
+        error["error"] = "Sorry, there is no children's song with that number. The most recent new song known to the API has the number " + most_recent.to_s
         error.to_json
     end
 
 end
 
 # search results
-get '/search/:string' do
+get "/search/:string" do
 
 end
 
 # most recent
-get '/most_recent' do
+get "/most_recent" do
     #grabs most recent children and new song according to home page
     content_type :json
 
@@ -313,26 +313,26 @@ get '/most_recent' do
     recent_ns = 0
     recent_c = 0
     home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
-    home.search('br').each do |n|
+    home.search("br").each do |n|
         n.replace("\n")
     end
-    for element in home.css('ul.songsublist li') do
-        if element.css('span.category').text.gsub!(/\P{ASCII}/, '') == "NewSongs"
-            num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+    for element in home.css("ul.songsublist li") do
+        if element.css("span.category").text.gsub!(/\P{ASCII}/, "") == "NewSongs"
+            num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
             if num > recent_ns
                 recent_ns = num
             end
         end
-        if element.css('span.category').text == "Children"
-            num = element.css('a')[0]['href'].gsub(/[^\d]/, '').to_i
+        if element.css("span.category").text == "Children"
+            num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
             if num > recent_c
                 recent_c = num
             end
         end
     end
 
-    recent['New Song'] = recent_ns
-    recent['Children'] = recent_c
+    recent["New Song"] = recent_ns
+    recent["Children"] = recent_c
     JSON.pretty_generate(recent)
 end
 
@@ -341,31 +341,31 @@ end
 ###################
 
 # category or sub-category
-get 'category/:category' do
+get "category/:category" do
     
 end
 
 # sort hymns by key
-get '/key/:key' do
+get "/key/:key" do
 
 end
 
 # composer
-get '/composer/:composer' do
+get "/composer/:composer" do
 
 end
 
 # author
-get 'author/:author' do
+get "author/:author" do
 
 end
 
 # meter
-get 'author/:meter' do
+get "author/:meter" do
     
 end
 
 # scripture reference
-get 'verse/:referece' do
+get "verse/:referece" do
     
 end
