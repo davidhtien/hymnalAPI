@@ -17,7 +17,7 @@ get "/" do
 end
 
 # classic hymns
-get "/hymn/:id" do
+get "/h/:id" do
 
     content_type :json
     
@@ -216,7 +216,7 @@ get "/ns/:id" do
 end
 
 # children
-get "/children/:id" do
+get "/c/:id" do
     content_type :json
 
     #this method is not completely accurate since hymnal.net doesn"t always put the most recent songs on the front page
