@@ -22,7 +22,7 @@ get "/h/:id" do
     content_type :json
     
     # {id} must be an int between 1-1348
-    hymnURL = "http://hymnal.net/hymn.php/h/#{params[:id]}"
+    hymnURL = "https://www.hymnal.net/en/hymn/h/#{params[:id]}"
     if Integer(params[:id]) > 0 and Integer(params[:id]) < 1349
         page = Nokogiri::HTML(open(hymnURL))
 
@@ -34,32 +34,24 @@ get "/h/:id" do
             n.replace("\n")
         end
         
-        # extract hymn details w/ link
+        # extract hymn details w/ link (still needs to be implemented)
         # i.e. category, meter, composer, etc.
-        details = Hash.new
-        for element in page.css("div#details li") do
-            unless element.css("a").text.empty?
-                details[element.css("span.key").text] = [element.css("a").text, element.css("a")[0]["href"]]
-            else 
-                details[element.css("span.key").text] = nil
-            end
-        end
         
+        # grab title
+        hymn["title"] = page.css("div.main-content h1").text.strip()
+
         # extract lyrics
         lyrics = Hash.new
         # external site redirect - scrape witness-lee-hymns.org
-        if page.css("div.lyrics p[class=info]").text == "View Lyrics (external site)"
+        if page.css("div.lyrics a")[0]["href"].include?("witness-lee-hymns")
             # pad zeroes
             id = params[:id].rjust(4, "0")
-            hymnURL = page.css("div.lyrics p a")[0]["href"]
+            hymnURL = page.css("div.lyrics a")[0]["href"]
             page = Nokogiri::HTML(open(hymnURL))
 
-            # grab title
-            hymn["title"] = page.css("h1").text.strip()
             # grab author
-            details["Lyrics:"] = page.search("[text()*='AUTHOR:']").first.parent.text.gsub("AUTHOR:", "").strip
+            # details["Lyrics:"] = page.search("[text()*='AUTHOR:']").first.parent.text.gsub("AUTHOR:", "").strip
 
-            # 
             for element in page.css("table[width='500'] tr td") do
                 # only consider <td> if content is not whitespace
                 unless element.text.gsub(/[[:space:]]/, "") == ""
@@ -72,50 +64,48 @@ get "/h/:id" do
                         lyrics["chorus"] = []
                     # if line
                     else
-                        lyrics[lyrics.keys.last].push(element.text)
+                        lyrics[lyrics.keys.last].push(clean_content(element.text))
                     end
                 end
             end
         # scrape hymnal.net
         else        
-            # grab title
-            hymn["title"] = page.css("div.post-title span").text.strip()
-            for element in page.css("div.lyrics li") do
-                # verse numbers are denoted in <li value="1"> tags
-                if element["value"]
+            for element in page.css("div.lyrics tr") do
+                # verse numbers are denoted as <td>1</td>
+                stanza_num = element.css('td div[class="stanza-num"]')
+                chorus = element.css('td[class="chorus"]')
+                if stanza_num[0]
                     # store stanza as a list of lines
-                    lyrics["stanza " + element["value"]] = element.text.split("\n")
+                    p element.css('td')[1].text
+                    lyrics["stanza " + stanza_num[0].text] = clean_content(element.css('td')[1].text).split("\n")
 
-                # chorus(es) are denoted in <li class="chorus"> tags
-                elsif element["class"]
-                    if !lyrics.has_key?(element["class"])
-                        lyrics[element["class"]] = element.text.split("\n")
+                # chorus(es) are denoted in <td class="chorus"> tags
+                elsif chorus[0]
+                    if !lyrics.has_key?(chorus[0]["class"])
+                        lyrics[chorus[0]["class"]] = clean_content(chorus[0].text).split("\n")
                     # if there are multiple choruses:
                     else
                         # append some whitespace to create a unique key
-                        lyrics[element["class"] + " " + String(1+lyrics.length/2)] = element.text.split("\n")
+                        lyrics[chorus[0]["class"] + " " + String(1+lyrics.length/2)] = clean_content(chorus[0].text).split("\n")
                     end
                 end
             end
         end
 
-        #Is there a new tune or alternate tune?
-        #Doesn"t work for all cases yet
+        # Is there a new tune or alternate tune?
+        # Doesn"t work for all cases yet
         tunes = Hash.new
-        puts "got here"
-        for element in page.css("div.relatedsongs li")
-            puts element.css("a").text
-            puts element.css("a").text.ascii_only?
-            if element.css("a").text == "New Tune"
-                tunes["New Tune"] = element.css("a")[0]["href"]
+        for element in page.css("div.hymn-related-songs div.list-group a")
+            if element.text == "New Tune"
+                tunes["New Tune"] = element["href"]
             end
-            if element.css("a").text == "Alternate Tune"
-                tunes["Alternate Tune"] = element.css("a")[0]["href"]
+            if element.text == "Alternate Tune"
+                tunes["Alternate Tune"] = element["href"]
             end
         end
 
         # build and return JSON
-        hymn["details"] = details
+        # hymn["details"] = details
         hymn["lyrics"] = lyrics
         unless tunes.empty?
             hymn["tunes"] = tunes
@@ -140,13 +130,13 @@ get "/ns/:id" do
     #will need to add onto this
     most_recent = 0
     while most_recent == 0
-        home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
+        home = Nokogiri::HTML(open("https://www.hymnal.net/en/home"))
         home.search("br").each do |n|
             n.replace("\n")
         end
-        for element in home.css("ul.songsublist li") do
-            if element.css("span.category").text.gsub!(/\P{ASCII}/, "") == "NewSongs"
-                num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
+        for element in home.css("div.song-list a") do
+            if element["href"].include?("/ns/")
+                num = element["href"].gsub(/[^\d]/, "").to_i
                 if num > most_recent
                     most_recent = num
                 end
@@ -156,7 +146,7 @@ get "/ns/:id" do
 
     puts most_recent
 
-    nsURL = "http://hymnal.net/hymn.php/ns/#{params[:id]}"
+    nsURL = "https://www.hymnal.net/en/hymn/ns/#{params[:id]}"
     if Integer(params[:id]) > 0 and Integer(params[:id]) <= Integer(most_recent)
         page = Nokogiri::HTML(open(nsURL))
 
@@ -168,41 +158,35 @@ get "/ns/:id" do
             n.replace("\n")
         end
         
-        # extract song details w/ link
+        # extract song details w/ link (still needs to be implemented)
         # i.e. category, meter, composer, etc.
-        details = Hash.new
-        for element in page.css("div#details li") do
-            #puts element.css("a").text.empty?
-            unless element.css("a").text.empty?
-                details[element.css("span.key").text] = [element.css("a").text, element.css("a")[0]["href"]]
-            else 
-                details[element.css("span.key").text] = nil
-            end
-        end
 
         lyrics = Hash.new
         # grab title
-        newSong["title"] = page.css("div.post-title span").text.strip()
-        for element in page.css("div.lyrics li") do
-            # verse numbers are denoted in <li value="1"> tags
-            if element["value"]
+        newSong["title"] = page.css("div.main-content h1").text.strip()
+        for element in page.css("div.lyrics tr") do
+            # verse numbers are denoted as <td>1</td>
+            stanza_num = element.css('td div[class="stanza-num"]')
+            chorus = element.css('td[class="chorus"]')
+            if stanza_num[0]
                 # store stanza as a list of lines
-                lyrics["stanza " + element["value"]] = element.text.split("\n")
+                p element.css('td')[1].text
+                lyrics["stanza " + stanza_num[0].text] = clean_content(element.css('td')[1].text).split("\n")
 
-            # chorus(es) are denoted in <li class="chorus"> tags
-            elsif element["class"]
-                if !lyrics.has_key?(element["class"])
-                    lyrics[element["class"]] = element.text.split("\n")
+            # chorus(es) are denoted in <td class="chorus"> tags
+            elsif chorus[0]
+                if !lyrics.has_key?(chorus[0]["class"])
+                    lyrics[chorus[0]["class"]] = clean_content(chorus[0].text).split("\n")
                 # if there are multiple choruses:
                 else
                     # append some whitespace to create a unique key
-                    lyrics[element["class"] + " " + String(1+lyrics.length/2)] = element.text.split("\n")
+                    lyrics[chorus[0]["class"] + " " + String(1+lyrics.length/2)] = clean_content(chorus[0].text).split("\n")
                 end
             end
         end
 
         # build and return JSON
-        newSong["details"] = details
+        # newSong["details"] = details
         newSong["lyrics"] = lyrics
         JSON.pretty_generate(newSong)
 
@@ -223,13 +207,13 @@ get "/c/:id" do
     #will need to add onto this
     most_recent = 0
     while most_recent == 0
-        home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
+        home = Nokogiri::HTML(open("https://www.hymnal.net/en/home"))
         home.search("br").each do |n|
             n.replace("\n")
         end
-        for element in home.css("ul.songsublist li") do
-            if element.css("span.category").text == "Children"
-                num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
+        for element in home.css("div.song-list a") do
+            if element["href"].include?("/c/")
+                num = element["href"].gsub(/[^\d]/, "").to_i
                 if num > most_recent
                     most_recent = num
                 end
@@ -239,7 +223,7 @@ get "/c/:id" do
 
     puts most_recent
 
-    childrenURL = "http://hymnal.net/hymn.php/c/#{params[:id]}"
+    childrenURL = "https://www.hymnal.net/en/hymn/c/#{params[:id]}"
     if Integer(params[:id]) > 0 and Integer(params[:id]) <= Integer(most_recent)
         page = Nokogiri::HTML(open(childrenURL))
 
@@ -251,42 +235,48 @@ get "/c/:id" do
             n.replace("\n")
         end
         
-        # extract song details w/ link
+        # extract song details w/ link (still needs to be implemented)
         # i.e. category, meter, composer, etc.
-        details = Hash.new
-        for element in page.css("div#details li") do
-            #puts element.css("a").text.empty?
-            unless element.css("a").text.empty?
-                details[element.css("span.key").text] = [element.css("a").text, element.css("a")[0]["href"]]
-            else 
-                details[element.css("span.key").text] = nil
-            end
-        end
 
         lyrics = Hash.new
         # grab title
-        children["title"] = page.css("div.post-title span").text.strip()
-        for element in page.css("div.lyrics li") do
-            # verse numbers are denoted in <li value="1"> tags
-            if element["value"]
+        children["title"] = page.css("div.main-content h1").text.strip()
+        for element in page.css("div.lyrics tr") do
+            # verse numbers are denoted as <td>1</td>
+            stanza_num = element.css('td div[class="stanza-num"]')
+            chorus = element.css('td[class="chorus"]')
+            if stanza_num[0]
                 # store stanza as a list of lines
-                lyrics["stanza " + element["value"]] = element.text.split("\n")
+                lyrics["stanza " + stanza_num[0].text] = clean_content(element.css('td')[1].text).split("\n")
 
-            # chorus(es) are denoted in <li class="chorus"> tags
-            elsif element["class"]
-                if !lyrics.has_key?(element["class"])
-                    lyrics[element["class"]] = element.text.split("\n")
+            # chorus(es) are denoted in <td class="chorus"> tags
+            elsif chorus[0]
+                if !lyrics.has_key?(chorus[0]["class"])
+                    lyrics[chorus[0]["class"]] = clean_content(chorus[0].text).split("\n")
                 # if there are multiple choruses:
                 else
                     # append some whitespace to create a unique key
-                    lyrics[element["class"] + " " + String(1+lyrics.length/2)] = element.text.split("\n")
+                    lyrics[chorus[0]["class"] + " " + String(1+lyrics.length/2)] = clean_content(chorus[0].text).split("\n")
                 end
+
+            # children's songs don't always have stanza numbers like hymns and new songs
+            elsif element.css('td').length > 1
+                # use length of hash to keep track of stanza number (not the best way due to possibility of chorus)
+                # but there are so few children's songs that it shouldn't matter
+                # basically super hacky solution
+                lyrics["stanza " + (lyrics.length + 1).to_s] = clean_content(element.css('td')[1].text).split("\n")
             end
         end
 
+        copyright = Hash.new
+        # grab copyright
+        # puts clean_content(page.css('td[class="copyright"] small').text)
+        copyright["copyright"] = clean_content(page.css('td[class="copyright"] small').text).gsub("\n", " ")
+
         # build and return JSON
-        children["details"] = details
+        # children["details"] = details
         children["lyrics"] = lyrics
+        children["copyright"] = copyright
         JSON.pretty_generate(children)
 
     else
@@ -298,7 +288,7 @@ get "/c/:id" do
 
 end
 
-# search results
+# search results (still needs to be implemented)
 get "/search/:string" do
 
 end
@@ -312,19 +302,19 @@ get "/most_recent" do
 
     recent_ns = 0
     recent_c = 0
-    home = Nokogiri::HTML(open("http://www.hymnal.net/en/home.php"))
+    home = Nokogiri::HTML(open("https://www.hymnal.net/en/home"))
     home.search("br").each do |n|
         n.replace("\n")
     end
-    for element in home.css("ul.songsublist li") do
-        if element.css("span.category").text.gsub!(/\P{ASCII}/, "") == "NewSongs"
-            num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
+
+    for element in home.css("div.song-list a") do
+        if element["href"].include?("/ns/")
+            num = element["href"].gsub(/[^\d]/, "").to_i
             if num > recent_ns
                 recent_ns = num
             end
-        end
-        if element.css("span.category").text == "Children"
-            num = element.css("a")[0]["href"].gsub(/[^\d]/, "").to_i
+        elsif element["href"].include?("/c/")
+            num = element["href"].gsub(/[^\d]/, "").to_i
             if num > recent_c
                 recent_c = num
             end
@@ -368,4 +358,8 @@ end
 # scripture reference
 get "verse/:referece" do
     
+end
+
+def clean_content(text)
+    return text.gsub(/[\u2018\u2019\u02bc\u055a\u07f4\u07f5\u0092]/, "'").gsub(/\u00a0/, "").gsub(/\u2014/, "-")
 end
